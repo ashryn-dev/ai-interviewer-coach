@@ -60,7 +60,7 @@ AI INTERVIEWER COACH/
 3. **Install dependencies**
 
 ```
-   pip install flask pdfplumber python-dotenv google-generativeai
+   pip install -r requirements.txt
 ```
 
 4. **Add your Gemini API key.** Create a file named `.env` in the project folder:
