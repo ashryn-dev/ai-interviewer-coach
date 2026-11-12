@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Your Interview Questions</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="shell narrow">
+    <nav class="nav">
+        <a class="brand" href="/"><span class="brand-mark">IC</span>Interviewer <em>Coach</em></a>
+        <div class="nav-links"><a href="/coding">Coding round</a><a href="/history">History</a></div>
+    </nav>
+
+    <div class="eyebrow rise" style="margin-top:40px;">STEP 2 OF 3</div>
+    <h1 class="rise d1">Your questions are <span class="accent">ready.</span></h1>
+    <p class="rise d2">{{ questions|length }} questions, written from your own resume. Take a breath, then start when you're ready.</p>
+
+    <ol class="question-list">
+        {% for q in questions %}
+            <li>{{ q }}</li>
+        {% endfor %}
+    </ol>
+
+    <a class="btn-link" href="/interview"><button>Start voice interview</button></a>
+    <a class="btn-link" href="/coding"><button class="secondary">Coding round</button></a>
+</div>
+</body>
+</html>

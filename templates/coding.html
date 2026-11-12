@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Coding Round</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .tabs { display: flex; gap: 10px; flex-wrap: wrap; margin: 18px 0 22px; }
+        .tab { padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); text-decoration: none; font-size: 14px; background: var(--surface); }
+        .tab.active { color: #231703; background: linear-gradient(180deg, #f1cf88, #d9a94e); border-color: transparent; font-weight: 600; }
+        .tab small { opacity: .7; margin-left: 6px; }
+        .coding-grid { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 22px; align-items: start; }
+        .panel { border: 1px solid var(--line); border-radius: 24px; padding: 26px; background: var(--surface); }
+        .panel h2 { font-size: 28px; margin-bottom: 8px; }
+        .diff { display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 12px; border-radius: 999px; background: var(--good-soft); color: var(--good); margin-bottom: 14px; }
+        .diff.Medium { background: var(--gold-soft); color: var(--gold); }
+        .diff.Hard { background: var(--low-soft); color: var(--low); }
+        .example { font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; font-size: 13px; background: rgba(0,0,0,.35); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; color: var(--ink); white-space: pre-wrap; overflow-x: auto; }
+        .livebar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; font-size: 14px; color: var(--muted); }
+        .livebar .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--low); margin-right: 8px; box-shadow: 0 0 8px var(--low); }
+        .timer { font-family: 'JetBrains Mono', monospace; font-size: 18px; color: var(--ink); }
+        .timer.over { color: var(--low); }
+        textarea.code { width: 100%; height: 360px; background: #0b0b0c; color: #f4f1ea; border: 1px solid var(--line); border-radius: 16px; padding: 16px;
+            font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; font-size: 14px; line-height: 1.6; tab-size: 4; white-space: pre; overflow: auto; resize: vertical; }
+        textarea.code:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
+        .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; }
+        .toolbar .words { color: var(--muted); font-size: 14px; margin-left: 8px; }
+        .note { color: var(--muted); font-size: 14px; margin: 10px 0 0; max-width: none; }
+        #think-btn.on { background: linear-gradient(180deg, #ef9c80, #d8714f); color: #2a0e05; }
+        .result { margin-top: 18px; }
+        .result .head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+        .badge { font-family: 'JetBrains Mono', monospace; font-size: 13px; padding: 4px 13px; border-radius: 999px; background: var(--gold-soft); color: var(--gold); }
+        .badge.good { background: var(--good-soft); color: var(--good); }
+        .badge.low { background: var(--low-soft); color: var(--low); }
+        .test { border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; font-size: 14px; background: rgba(0,0,0,.25); }
+        .test .row { display: flex; justify-content: space-between; gap: 10px; color: var(--ink); }
+        .test .tag { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+        .test .tag.pass { color: var(--good); } .test .tag.fail { color: var(--low); }
+        .test .detail { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); margin-top: 6px; white-space: pre-wrap; word-break: break-all; }
+        .errtext { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--low); white-space: pre-wrap; background: var(--low-soft); border-radius: 12px; padding: 12px 14px; }
+        .hint-item { border-left: 3px solid var(--gold); padding: 8px 14px; margin: 10px 0; color: var(--ink); font-size: 15px; background: var(--gold-soft); border-radius: 0 12px 12px 0; }
+        #feedback { margin-top: 22px; }
+        @media (max-width: 900px) { .coding-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+<div class="shell">
+    <nav class="nav">
+        <a class="brand" href="/"><span class="brand-mark">IC</span>Interviewer <em>Coach</em></a>
+        <div class="nav-links"><a href="/upload">Interview</a><a href="/history">History</a></div>
+    </nav>
+
+    <div class="eyebrow" style="margin-top:30px;">CODING ROUND</div>
+    <h1>Solve it <span class="accent">out loud.</span></h1>
+    <p>Pick a problem, think aloud while you code, and run your solution against hidden tests. Hints nudge you, and never give the answer.</p>
+
+    <div class="tabs">
+        {% for p in problems %}
+        <a class="tab {% if p.id == pid %}active{% endif %}" href="/coding?problem={{ p.id }}">{{ p.title }}<small>{{ p.difficulty }}</small></a>
+        {% endfor %}
+    </div>
+
+    <div class="coding-grid">
+        <div class="panel">
+            <h2>{{ title }}</h2>
+            <span class="diff {{ difficulty }}">{{ difficulty }}</span>
+            <p style="max-width:none; color: var(--ink);">{{ statement }}</p>
+            <h3>Example</h3>
+            <div class="example">{{ example }}</div>
+            <h3>Hints</h3>
+            <button class="secondary" id="hint-btn">Get a hint (0 of {{ hint_count }})</button>
+            <div id="hints"></div>
+        </div>
+
+        <div class="panel">
+            <div class="livebar">
+                <span><span class="dot"></span>Live · Python</span>
+                <span class="timer" id="timer">20:00</span>
+            </div>
+            <textarea class="code" id="code" spellcheck="false" autocomplete="off" autocapitalize="off">{{ starter }}</textarea>
+            <div class="toolbar">
+                <button id="run-btn">Run tests</button>
+                <button class="secondary" id="think-btn">Think aloud: off</button>
+                <button class="secondary" id="reset-btn">Reset</button>
+                <span class="words">Spoken while coding: <b id="words">0</b> words</span>
+            </div>
+            <p class="note" id="note">Tip: press Ctrl + Enter to run. Keep the function name from the starter code.</p>
+            <div class="result" id="result"></div>
+            <div style="margin-top:18px;">
+                <button id="finish-btn">Finish and get feedback</button>
+            </div>
+            <div id="feedback"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const PID = {{ pid|tojson }};
+    const STARTER = {{ starter|tojson }};
+    const HINT_TOTAL = {{ hint_count }};
+    const LIMIT_SECONDS = 20 * 60;
+
+    const editor = document.getElementById("code");
+    const resultBox = document.getElementById("result");
+    const noteEl = document.getElementById("note");
+    const timerEl = document.getElementById("timer");
+    const wordsEl = document.getElementById("words");
+    const hintBtn = document.getElementById("hint-btn");
+    const hintsBox = document.getElementById("hints");
+    const thinkBtn = document.getElementById("think-btn");
+    const runBtn = document.getElementById("run-btn");
+    const finishBtn = document.getElementById("finish-btn");
+    const feedbackBox = document.getElementById("feedback");
+
+    let startedAt = Date.now();
+    let runs = 0, hintsUsed = 0, spokenWords = 0, lastResult = null;
+
+    // ---- keep the code if the page is reloaded ----
+    const KEY = "code:" + PID;
+    try { const saved = sessionStorage.getItem(KEY); if (saved) editor.value = saved; } catch (e) {}
+    editor.addEventListener("input", () => { try { sessionStorage.setItem(KEY, editor.value); } catch (e) {} });
+
+    // ---- editor keys: Tab inserts spaces, Ctrl+Enter runs ----
+    editor.addEventListener("keydown", (e) => {
+        if (e.key === "Tab") {
+            e.preventDefault();
+            const s = editor.selectionStart, t = editor.selectionEnd;
+            editor.value = editor.value.slice(0, s) + "    " + editor.value.slice(t);
+            editor.selectionStart = editor.selectionEnd = s + 4;
+        } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            runTests();
+        }
+    });
+
+    document.getElementById("reset-btn").addEventListener("click", () => {
+        if (confirm("Reset your code to the starter code?")) {
+            editor.value = STARTER;
+            try { sessionStorage.removeItem(KEY); } catch (e) {}
+        }
+    });
+
+    // ---- timer ----
+    function elapsedSeconds() { return Math.floor((Date.now() - startedAt) / 1000); }
+    setInterval(() => {
+        const left = LIMIT_SECONDS - elapsedSeconds();
+        const shown = Math.abs(left);
+        const mm = String(Math.floor(shown / 60)).padStart(2, "0");
+        const ss = String(shown % 60).padStart(2, "0");
+        timerEl.textContent = (left < 0 ? "+" : "") + mm + ":" + ss;
+        timerEl.classList.toggle("over", left < 0);
+    }, 1000);
+
+    // ---- hints ----
+    hintBtn.addEventListener("click", async () => {
+        if (hintsUsed >= HINT_TOTAL) return;
+        hintBtn.disabled = true;
+        try {
+            const res = await fetch("/hint?problem=" + encodeURIComponent(PID) + "&level=" + (hintsUsed + 1));
+            const data = await res.json();
+            const item = document.createElement("div");
+            item.className = "hint-item";
+            item.textContent = "Hint " + (hintsUsed + 1) + ": " + data.hint;
+            hintsBox.appendChild(item);
+            hintsUsed++;
+        } catch (e) {
+            noteEl.textContent = "Could not load the hint. Is the server still running?";
+        }
+        hintBtn.textContent = "Get a hint (" + hintsUsed + " of " + HINT_TOTAL + ")";
+        hintBtn.disabled = hintsUsed >= HINT_TOTAL;
+    });
+
+    // ---- run tests ----
+    function el(tag, cls, text) {
+        const n = document.createElement(tag);
+        if (cls) n.className = cls;
+        if (text !== undefined) n.textContent = text;
+        return n;
+    }
+
+    function renderResult(r) {
+        resultBox.innerHTML = "";
+        const head = el("div", "head");
+        let label, cls = "";
+        if (r.status === "passed") { label = "All " + r.total + " tests passed"; cls = "good"; }
+        else if (r.status === "timeout") { label = "Time limit exceeded (" + r.passed + " of " + r.total + " passed)"; cls = "low"; }
+        else if (r.status === "failed") { label = r.passed + " of " + r.total + " tests passed"; cls = r.passed === 0 ? "low" : ""; }
+        else if (r.status === "compile_error") { label = "Your code has an error"; cls = "low"; }
+        else { label = "Could not run"; cls = "low"; }
+        head.appendChild(el("span", "badge " + cls, label));
+        if (r.seconds !== undefined) head.appendChild(el("span", "note", "ran in " + r.seconds + "s"));
+        resultBox.appendChild(head);
+
+        if (r.message) resultBox.appendChild(el("div", "errtext", r.message));
+
+        (r.tests || []).forEach((t) => {
+            const box = el("div", "test");
+            const row = el("div", "row");
+            row.appendChild(el("span", "", "Test " + t.index + (t.visible ? "" : " (hidden)")));
+            row.appendChild(el("span", "tag " + (t.passed ? "pass" : "fail"), t.passed ? "PASS" : "FAIL"));
+            box.appendChild(row);
+            if (!t.passed && t.visible) {
+                let d = "Input:    " + t.input + "\nExpected: " + t.expected;
+                if (t.got !== undefined) d += "\nYour output: " + t.got;
+                if (t.note) d += "\n" + t.note;
+                box.appendChild(el("div", "detail", d));
+            } else if (!t.passed && t.note) {
+                box.appendChild(el("div", "detail", t.note));
+            }
+            resultBox.appendChild(box);
+        });
+    }
+
+    async function runTests() {
+        runBtn.disabled = true;
+        runBtn.textContent = "Running...";
+        resultBox.innerHTML = "";
+        resultBox.appendChild(el("p", "note", "Running your code against the tests..."));
+        try {
+            const res = await fetch("/run", { method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ problem: PID, code: editor.value }) });
+            lastResult = await res.json();
+            runs++;
+            renderResult(lastResult);
+        } catch (e) {
+            resultBox.innerHTML = "";
+            resultBox.appendChild(el("div", "errtext", "Could not reach the server. Check that python app.py is running."));
+        }
+        runBtn.disabled = false;
+        runBtn.textContent = "Run tests";
+    }
+    runBtn.addEventListener("click", runTests);
+
+    // ---- think aloud (counts spoken words while you code) ----
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let rec = null, thinking = false;
+
+    function setThinkUI() {
+        thinkBtn.textContent = thinking ? "Think aloud: on" : "Think aloud: off";
+        thinkBtn.classList.toggle("on", thinking);
+    }
+
+    function startThink() {
+        if (!SR) { noteEl.textContent = "Speech recognition is not available here. Please use Chrome or Edge."; return; }
+        rec = new SR();
+        rec.lang = "en-US";
+        rec.continuous = true;
+        rec.interimResults = false;
+        rec.onresult = (e) => {
+            for (let i = e.resultIndex; i < e.results.length; i++) {
+                if (e.results[i].isFinal) {
+                    spokenWords += e.results[i][0].transcript.trim().split(/\s+/).filter(Boolean).length;
+                }
+            }
+            wordsEl.textContent = spokenWords;
+        };
+        rec.onerror = (e) => {
+            if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+                thinking = false; setThinkUI();
+                noteEl.textContent = "Microphone permission was blocked. Allow it in the browser address bar and try again.";
+            } else if (e.error === "network") {
+                noteEl.textContent = "The speech service could not be reached. It will keep trying.";
+            }
+        };
+        rec.onend = () => { if (thinking) { try { rec.start(); } catch (e) {} } };
+        try { rec.start(); thinking = true; noteEl.textContent = "Listening. Say what you are thinking as you write."; } catch (e) { thinking = false; }
+        setThinkUI();
+    }
+
+    function stopThink() {
+        thinking = false;
+        if (rec) { try { rec.stop(); } catch (e) {} }
+        setThinkUI();
+        noteEl.textContent = "Think aloud is off.";
+    }
+    thinkBtn.addEventListener("click", () => { thinking ? stopThink() : startThink(); });
+
+    // ---- finish and feedback ----
+    function addLines(parent, titleCls, title, lines) {
+        if (!lines || !lines.length) return;
+        parent.appendChild(el("div", titleCls, title));
+        lines.forEach((l) => parent.appendChild(el("p", "line", l)));
+    }
+
+    function renderFeedback(d) {
+        feedbackBox.innerHTML = "";
+        const card = el("div", "report-card");
+        const head = el("div", "report-head");
+        head.appendChild(el("span", "t", "Your coding feedback"));
+        const right = el("span", "score-big");
+        right.appendChild(document.createTextNode(String(d.score)));
+        right.appendChild(el("small", "", "/100"));
+        right.appendChild(el("span", "verdict " + (d.level || ""), d.verdict || ""));
+        head.appendChild(right);
+        card.appendChild(head);
+        addLines(card, "well", "What went well", d.went_well);
+        addLines(card, "held", "What held you back", d.held_back);
+        if (d.fix_first) {
+            const fix = el("div", "fixfirst");
+            fix.appendChild(el("b", "", "Fix this first"));
+            fix.appendChild(el("span", "", d.fix_first));
+            card.appendChild(fix);
+        }
+        feedbackBox.appendChild(card);
+    }
+
+    finishBtn.addEventListener("click", async () => {
+        if (thinking) stopThink();
+        finishBtn.disabled = true;
+        finishBtn.textContent = "Reviewing your solution...";
+        feedbackBox.innerHTML = "";
+        try {
+            const res = await fetch("/code-feedback", { method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    problem: PID, code: editor.value,
+                    passed: lastResult ? lastResult.passed : 0, total: lastResult ? lastResult.total : 0,
+                    status: lastResult ? lastResult.status : "not_run",
+                    runs: runs, hints: hintsUsed, spoken_words: spokenWords, seconds: elapsedSeconds()
+                }) });
+            if (!res.ok) throw new Error("not ready");
+            renderFeedback(await res.json());
+        } catch (e) {
+            feedbackBox.appendChild(el("p", "note", "Feedback is not available yet. It comes with the next step of the build."));
+        }
+        finishBtn.disabled = false;
+        finishBtn.textContent = "Finish and get feedback";
+    });
+</script>
+</body>
+</html>

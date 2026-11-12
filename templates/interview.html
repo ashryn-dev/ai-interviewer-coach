@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Mock Interview</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="shell narrow">
+    <nav class="nav">
+        <a class="brand" href="/"><span class="brand-mark">IC</span>Interviewer <em>Coach</em></a>
+        <a class="nav-exit" href="/upload">Exit interview</a>
+    </nav>
+
+    <!-- 1. Choose interviewer -->
+    <section id="setup-view">
+        <div class="eyebrow rise" style="margin-top:40px;">STEP 3 OF 3</div>
+        <h1 class="rise d1">Choose your <span class="accent">interviewer.</span></h1>
+        <p class="rise d2">{{ questions|length }} questions are ready. Pick who you want to face, then start talking.</p>
+
+        <div class="persona-grid rise d3" id="persona-grid" role="radiogroup" aria-label="Interviewer"></div>
+
+        <div class="voicebar rise d3">
+            <label for="voice-select">Voice</label>
+            <select id="voice-select"><option>Default voice</option></select>
+            <button type="button" id="voice-test" class="secondary small">Test voice</button>
+        </div>
+
+        <button type="button" id="start-btn">Start interview</button>
+        <p id="setup-note" class="note"></p>
+    </section>
+
+    <!-- 2. Interview -->
+    <section id="interview-view" style="display:none;">
+        <div class="interview-card">
+            <div class="who-row">
+                <div class="orb" id="orb"></div>
+                <div class="who" id="who-label"></div>
+            </div>
+
+            <div class="progress-dots" id="dots"></div>
+            <div class="eyebrow" id="question-counter"></div>
+            <p id="question-text"></p>
+
+            <textarea id="answer-text" rows="4" placeholder="Press Record and speak. Your words appear here, and you can edit them before moving on."></textarea>
+            <div class="bubble nudge" id="nudge" style="display:none;"></div>
+            <p id="mic-status" class="note"></p>
+
+            <div class="actions">
+                <button type="button" id="answer-btn">Record answer</button>
+                <button type="button" id="replay-btn" class="secondary">Repeat question</button>
+                <button type="button" id="next-btn">Next question</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. Loading -->
+    <section id="loading-view" class="center" style="display:none;">
+        <div class="orb"></div>
+        <h2 id="loading-title">Evaluating your answers…</h2>
+        <p id="loading-sub">This can take a few seconds.</p>
+        <button type="button" id="retry-btn" style="display:none;">Try again</button>
+    </section>
+
+    <!-- 4. Report -->
+    <section id="results-view" style="display:none;"></section>
+
+    <p id="error-note" class="note low-text"></p>
+</div>
+
+<script>
+    window.onerror = function (msg, src, line) {
+        const el = document.getElementById("error-note");
+        if (el) el.textContent = "Script error: " + msg + " (line " + line + ")";
+    };
+
+    const questions = {{ questions | tojson }};
+
+    // Each interviewer changes the voice, the pace, and how much detail they insist on.
+    const PERSONAS = {
+        meera: {
+            name: "Meera", level: "Warm-up",
+            blurb: "Friendly and patient. Gentle nudges, a good first interview.",
+            rate: 0.92, pitch: 1.1, minWords: 10,
+            opener: "Hi, I'm Meera. Relax and take your time. Let's begin.",
+            nudge: "That's a start. Can you add one example from your own project?"
+        },
+        kabir: {
+            name: "Kabir", level: "Real round",
+            blurb: "Direct and specific. Wants details about what you did, not claims.",
+            rate: 1.0, pitch: 0.9, minWords: 20,
+            opener: "I'm Kabir. I'll ask about the work on your resume. Be specific.",
+            nudge: "I need more detail than that. What exactly did you do, and what was the result?"
+        },
+        ira: {
+            name: "Ira", level: "Bar-raiser",
+            blurb: "Strict and quick. Pushes for numbers, decisions and trade-offs.",
+            rate: 1.08, pitch: 1.0, minWords: 30,
+            opener: "I'm Ira. I'll push on the details, so be precise.",
+            nudge: "That's too thin for this round. Give me the decision you made, the trade-off, and a number."
+        }
+    };
+    const EMPTY_NUDGE = "Take a moment and give it a try. Even a rough answer helps.";
+
+    const $ = (id) => document.getElementById(id);
+    const countWords = (t) => (t && t.trim() ? t.trim().split(/\s+/).length : 0);
+    const short = (t, n) => (t.length > n ? t.slice(0, n - 1) + "…" : t);
+    function store(key, val) { try { localStorage.setItem(key, val); } catch (e) {} }
+    function load(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
+    function el(tag, cls, text) {
+        const n = document.createElement(tag);
+        if (cls) n.className = cls;
+        if (text !== undefined) n.textContent = text;
+        return n;
+    }
+
+    let personaId = PERSONAS[load("icPersona")] ? load("icPersona") : "meera";
+    const persona = () => PERSONAS[personaId];
+
+    let currentIndex = 0;
+    let nudged = false;
+    let listening = false;
+    let finalText = "";
+    let voices = [];
+    const answers = [];
+
+    const setupView = $("setup-view");
+    const interviewView = $("interview-view");
+    const loadingView = $("loading-view");
+    const resultsView = $("results-view");
+    const answerBox = $("answer-text");
+    const answerBtn = $("answer-btn");
+    const nextBtn = $("next-btn");
+    const orb = $("orb");
+    const voiceSelect = $("voice-select");
+
+    // ---------- interviewer picker ----------
+    function renderPersonas() {
+        const grid = $("persona-grid");
+        grid.innerHTML = "";
+        Object.keys(PERSONAS).forEach((id) => {
+            const p = PERSONAS[id];
+            const card = el("div", "persona" + (id === personaId ? " selected" : ""));
+            card.tabIndex = 0;
+            card.setAttribute("role", "radio");
+            card.setAttribute("aria-checked", id === personaId ? "true" : "false");
+            card.append(
+                el("div", "avatar", p.name.charAt(0)),
+                el("div", "tag", p.level),
+                el("div", "pname", p.name),
+                el("p", "", p.blurb)
+            );
+            const choose = () => { personaId = id; store("icPersona", id); renderPersonas(); };
+            card.addEventListener("click", choose);
+            card.addEventListener("keydown", (e) => {
+                if (e.key === "Enter" || e.key === " ") { e.preventDefault(); choose(); }
+            });
+            grid.appendChild(card);
+        });
+    }
+    renderPersonas();
+
+    // ---------- speech output (never throws) ----------
+    function speak(text) {
+        try {
+            const synth = window.speechSynthesis;
+            if (!synth) return;
+            synth.cancel();
+            const u = new SpeechSynthesisUtterance(text);
+            const v = voices.find((x) => x.name === voiceSelect.value);
+            if (v) { u.voice = v; u.lang = v.lang; }
+            u.rate = persona().rate;
+            u.pitch = persona().pitch;
+            u.onstart = () => orb.classList.add("speaking");
+            u.onend = () => orb.classList.remove("speaking");
+            u.onerror = () => orb.classList.remove("speaking");
+            setTimeout(() => synth.speak(u), 150);
+        } catch (e) { console.log("Speech output unavailable", e); }
+    }
+    function stopSpeaking() {
+        try { window.speechSynthesis.cancel(); } catch (e) {}
+        orb.classList.remove("speaking");
+    }
+
+    function loadVoices() {
+        voices = (window.speechSynthesis ? window.speechSynthesis.getVoices() : [])
+            .filter((v) => v.lang.startsWith("en"));
+        if (!voices.length) return;
+        const current = voiceSelect.value || load("voiceName");
+        voiceSelect.innerHTML = "";
+        voices.forEach((v) => {
+            const o = document.createElement("option");
+            o.value = v.name;
+            o.textContent = v.name + " (" + v.lang + ")";
+            voiceSelect.appendChild(o);
+        });
+        const pick = voices.find((v) => v.name === current)
+            || voices.find((v) => /natural/i.test(v.name))
+            || voices.find((v) => /google/i.test(v.name))
+            || voices[0];
+        voiceSelect.value = pick.name;
+    }
+    try {
+        loadVoices();
+        if (window.speechSynthesis) window.speechSynthesis.onvoiceschanged = loadVoices;
+        voiceSelect.addEventListener("change", () => store("voiceName", voiceSelect.value));
+        $("voice-test").addEventListener("click", () => speak(persona().opener));
+    } catch (e) { console.log("Voice list unavailable", e); }
+
+    // ---------- speech input ----------
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let rec = null;
+
+    function setListeningUI(on) {
+        orb.classList.toggle("listening", on);
+        answerBtn.classList.toggle("listening", on);
+        answerBtn.textContent = on ? "Stop recording" : "Record answer";
+        $("mic-status").textContent = on ? "Listening… speak naturally, then press Stop." : "";
+    }
+    function stopListening() {
+        listening = false;
+        try { if (rec) rec.stop(); } catch (e) {}
+        setListeningUI(false);
+    }
+
+    try {
+        if (SR) {
+            rec = new SR();
+            rec.lang = "en-IN";
+            rec.interimResults = true;
+            rec.continuous = true;
+
+            rec.addEventListener("result", (event) => {
+                let interim = "";
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const t = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) finalText += t + " ";
+                    else interim += t;
+                }
+                answerBox.value = (finalText + interim).trim();
+            });
+            rec.addEventListener("error", (event) => {
+                if (event.error === "no-speech" || event.error === "aborted") return;
+                listening = false;
+                setListeningUI(false);
+                $("mic-status").textContent = "Mic error: " + event.error + ". You can type your answer instead.";
+            });
+            rec.addEventListener("end", () => {
+                if (listening) { try { rec.start(); } catch (e) {} }   // Chrome stops on silence, so restart
+            });
+        }
+    } catch (e) {
+        console.log("Speech recognition unavailable", e);
+        rec = null;
+    }
+    if (!rec) {
+        $("setup-note").textContent = "Voice answers need Chrome or Edge. In this browser you can type your answers.";
+    }
+
+    answerBtn.addEventListener("click", () => {
+        if (!rec) {
+            $("mic-status").textContent = "Speech recognition isn't supported in this browser. Please type your answer.";
+            answerBox.focus();
+            return;
+        }
+        if (listening) { stopListening(); return; }
+        stopSpeaking();
+        finalText = answerBox.value.trim() ? answerBox.value.trim() + " " : "";
+        listening = true;
+        setListeningUI(true);
+        try { rec.start(); } catch (e) { console.log(e); }
+    });
+
+    // ---------- interview flow ----------
+    const dotsBox = $("dots");
+    function buildDots() {
+        dotsBox.innerHTML = "";
+        questions.forEach(() => dotsBox.appendChild(el("span", "dot")));
+    }
+    function updateDots() {
+        [...dotsBox.children].forEach((d, i) => {
+            d.classList.toggle("done", i < currentIndex);
+            d.classList.toggle("current", i === currentIndex);
+        });
+    }
+
+    function askQuestion(withOpener) {
+        const question = questions[currentIndex];
+        const qText = $("question-text");
+        qText.classList.add("fade");
+        setTimeout(() => { qText.textContent = question; qText.classList.remove("fade"); }, 200);
+
+        $("question-counter").textContent = "Question " + (currentIndex + 1) + " of " + questions.length;
+        answerBox.value = "";
+        finalText = "";
+        nudged = false;
+        $("nudge").style.display = "none";
+        $("mic-status").textContent = "";
+        nextBtn.textContent = (currentIndex === questions.length - 1) ? "Finish & get feedback" : "Next question";
+        updateDots();
+        speak(withOpener ? persona().opener + " " + question : question);
+    }
+
+    $("start-btn").addEventListener("click", () => {
+        if (!questions.length) {
+            $("setup-note").textContent = "No questions found. Please upload your resume first.";
+            return;
+        }
+        const p = persona();
+        const who = $("who-label");
+        who.textContent = p.name;
+        who.appendChild(el("small", "", p.level + " round"));
+        buildDots();
+        setupView.style.display = "none";
+        interviewView.style.display = "block";
+        askQuestion(true);
+    });
+
+    $("replay-btn").addEventListener("click", () => speak(questions[currentIndex]));
+
+    nextBtn.addEventListener("click", () => {
+        if (listening) stopListening();
+        const text = answerBox.value.trim();
+
+        // A short answer gets one follow-up nudge. Pressing Next again moves on.
+        if (!nudged && countWords(text) < persona().minWords) {
+            nudged = true;
+            const msg = text ? persona().nudge : EMPTY_NUDGE;
+            const box = $("nudge");
+            box.textContent = persona().name + ": " + msg;
+            box.appendChild(el("span", "nudge-hint", "Add more above, or press the button again to continue."));
+            box.style.display = "block";
+            speak(msg);
+            return;
+        }
+
+        answers.push({ question: questions[currentIndex], answer: text });
+        currentIndex++;
+        if (currentIndex < questions.length) askQuestion(false);
+        else finishInterview();
+    });
+
+    // ---------- evaluation ----------
+    async function finishInterview() {
+        stopSpeaking();
+        interviewView.style.display = "none";
+        loadingView.style.display = "block";
+        $("retry-btn").style.display = "none";
+        $("loading-title").textContent = "Evaluating your answers…";
+        $("loading-sub").textContent = "This can take a few seconds.";
+
+        try {
+            const res = await fetch("/evaluate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ answers })
+            });
+            if (!res.ok) throw new Error("Server returned " + res.status);
+            showResults(await res.json());
+        } catch (err) {
+            $("loading-title").textContent = "Could not get feedback.";
+            $("loading-sub").textContent =
+                "Check the terminal for the error (often an API quota limit). Your answers are kept, so wait a minute and try again. " + err.message;
+            $("retry-btn").style.display = "inline-block";
+        }
+    }
+    $("retry-btn").addEventListener("click", finishInterview);
+
+    function addLines(parent, lines) {
+        lines.forEach((l) => parent.appendChild(el("p", "line", l)));
+    }
+
+    function showResults(data) {
+        const results = data.results || [];
+        const avg = Number(data.average_score) || 0;
+        const total = Math.round(avg * 10);                 // /10 average shown as /100
+        const wordCounts = results.map((r) => countWords(r.answer));
+        const avgWords = wordCounts.length
+            ? Math.round(wordCounts.reduce((a, b) => a + b, 0) / wordCounts.length) : 0;
+        const answered = wordCounts.filter((w) => w > 0).length;
+        const scored = results.filter((r) => typeof r.score === "number");
+        const best = scored.length ? scored.reduce((a, b) => (b.score > a.score ? b : a)) : null;
+        const worst = scored.length ? scored.reduce((a, b) => (b.score < a.score ? b : a)) : null;
+
+        let verdictText = "Needs work", verdictCls = "low";
+        if (total >= 75) { verdictText = "Hire"; verdictCls = ""; }
+        else if (total >= 55) { verdictText = "Borderline"; verdictCls = "mid"; }
+
+        // progress across sessions, kept in this browser only
+        let history = [];
+        try { history = JSON.parse(load("icHistory") || "[]"); } catch (e) { history = []; }
+        const previous = history.slice(-5).map((h) => h.score);
+        history.push({ score: total, persona: persona().name, t: Date.now() });
+        store("icHistory", JSON.stringify(history.slice(-20)));
+
+        resultsView.innerHTML = "";
+        resultsView.appendChild(el("div", "eyebrow rise", "YOUR REPORT · " + persona().name.toUpperCase()));
+        const h1 = el("h1", "rise d1");
+        h1.append("Your ", el("span", "accent", "feedback."));
+        resultsView.appendChild(h1);
+
+        const card = el("div", "report-card rise d2");
+        const head = el("div", "report-head");
+        const sb = el("span", "score-big");
+        sb.append(String(total), el("small", "", "/100"),
+                  el("span", "verdict " + verdictCls, verdictText));
+        head.append(el("span", "t", "Overall"), sb);
+        card.appendChild(head);
+
+        // what went well
+        card.appendChild(el("div", "well", "What went well"));
+        const well = ["You answered " + answered + " of " + results.length + " questions."];
+        if (best && best.score >= 6) {
+            well.push("Your answer to \"" + short(best.question, 70) + "\" scored " + best.score + "/10.");
+        }
+        addLines(card, well);
+
+        // what held you back
+        card.appendChild(el("div", "held", "What held you back"));
+        const held = [];
+        if (worst && worst.score < 7) {
+            held.push("Your answer to \"" + short(worst.question, 70) + "\" scored " + worst.score + "/10.");
+        }
+        if (avgWords < 25) held.push("Your answers averaged " + avgWords + " words.");
+        if (!held.length) held.push("Nothing major. Keep this level of detail in every answer.");
+        addLines(card, held);
+
+        // fix first
+        let fix;
+        if (avgWords < 20) {
+            fix = "Give two or three sentences per answer, with one concrete detail from a project.";
+        } else if (worst && worst.score < 6) {
+            fix = "Rework your weakest answer, \"" + short(worst.question, 60) + "\", using the feedback below.";
+        } else {
+            fix = "Add numbers and outcomes to your strongest answers, such as time saved, users reached or errors cut.";
+        }
+        const fixBox = el("div", "fixfirst");
+        fixBox.append(el("b", "", "Fix this first"), el("span", "", fix));
+        card.appendChild(fixBox);
+
+        if (previous.length) {
+            card.appendChild(el("p", "trend",
+                "Recent scores: " + previous.join(" → ") + " → " + total + " (this one)"));
+        }
+        resultsView.appendChild(card);
+
+        // answer by answer
+        resultsView.appendChild(el("h3", "", "Answer by answer"));
+        const list = el("div", "qa-list");
+        results.forEach((r, i) => {
+            const block = el("div", "qa-block");
+            const cls = r.score >= 7 ? "good" : (r.score < 5 ? "low" : "");
+            block.append(
+                el("span", "q", (i + 1) + ". " + r.question),
+                el("span", "score-badge " + cls, r.score + "/10"),
+                el("span", "a", "You said: " + (r.answer || "(no answer)")),
+                el("span", "fb", r.feedback || "")
+            );
+            list.appendChild(block);
+        });
+        resultsView.appendChild(list);
+
+        const actions = el("div", "actions no-print");
+        actions.innerHTML =
+            '<a class="btn-link" href="/interview"><button type="button">Practice again</button></a>' +
+            '<a class="btn-link" href="/coding"><button type="button" class="secondary">Coding round</button></a>' +
+'<a class="btn-link" href="/history"><button type="button" class="secondary">My progress</button></a>' +
+'<a class="btn-link" href="/upload"><button type="button" class="secondary">New resume</button></a>' +
+            '<button type="button" class="secondary" id="print-btn">Save as PDF</button>';
+        resultsView.appendChild(actions);
+        $("print-btn").addEventListener("click", () => window.print());
+
+        loadingView.style.display = "none";
+        resultsView.style.display = "block";
+        window.scrollTo(0, 0);
+    }
+</script>
+</body>
+</html>

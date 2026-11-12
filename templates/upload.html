@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Upload Resume</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="shell narrow">
+    <nav class="nav">
+        <a class="brand" href="/"><span class="brand-mark">IC</span>Interviewer <em>Coach</em></a>
+    </nav>
+
+    <div class="eyebrow rise" style="margin-top:40px;">STEP 1 OF 3</div>
+    <h1 class="rise d1">Upload your <span class="accent">resume.</span></h1>
+    <p class="rise d2">We read your skills, projects and experience, then ask questions about the work you actually did.</p>
+
+    <div class="upload-box rise d3">
+        <form method="POST" enctype="multipart/form-data" id="upload-form">
+            <input type="file" name="resume" accept="application/pdf" required>
+            <button type="submit" id="upload-btn">Upload and generate questions</button>
+        </form>
+    </div>
+
+    {% if extracted %}
+        <h3>Extracted text</h3>
+        <pre>{{ extracted }}</pre>
+    {% endif %}
+</div>
+
+<script>
+    document.getElementById("upload-form").addEventListener("submit", function () {
+        const btn = document.getElementById("upload-btn");
+        btn.textContent = "Reading your resume...";
+        btn.style.opacity = "0.6";
+    });
+</script>
+</body>
+</html>

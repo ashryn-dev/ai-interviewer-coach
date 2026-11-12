@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AI Interviewer Coach</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="shell">
+    <nav class="nav">
+        <a class="brand" href="/"><span class="brand-mark">IC</span>Interviewer <em>Coach</em></a>
+        <div class="nav-links"><a href="#how">How it works</a><a href="#real">Why it feels real</a><a href="/coding">Coding round</a><a href="/history">History</a></div>
+    </nav>
+
+    <section class="hero">
+        <div>
+            <span class="pill rise">Spoken interviews · Resume-based questions · Honest feedback</span>
+            <h1 class="display rise d1">Face your interview <span class="orb sm"></span><br><em>before it's real.</em></h1>
+            <p class="rise d2">Upload your resume, answer out loud, and get scored feedback built from questions about your own projects, with one clear thing to fix first.</p>
+            <div class="rise d3"><a class="btn-link" href="/upload"><button>Upload your resume</button></a><a class="btn-link" href="/coding"><button class="secondary">Try the coding round</button></a></div>
+        </div>
+        <div class="hero-card rise d3">
+            <div class="top"><div class="orb"></div><div class="who">Your AI interviewer<small>Asking about your resume</small></div></div>
+            <div class="bubble">You mentioned cutting API response time by 35%. What was the bottleneck?</div>
+            <div class="bubble you">Mostly slow database queries, so I added indexes and caching.</div>
+            <div class="wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+        </div>
+    </section>
+
+    <section class="section" id="how">
+        <div class="eyebrow">How a session works</div>
+        <h2>One session, three parts, <em>all out loud.</em></h2>
+        <div class="steps">
+            <div class="step"><div class="num">01</div><h4>Upload</h4><p>Your resume is read, and the questions are about the projects you actually built.</p></div>
+            <div class="step"><div class="num">02</div><h4>Interview</h4><p>Each question is spoken. You answer by voice, fix any mis-heard words, and move on.</p></div>
+            <div class="step"><div class="num">03</div><h4>Feedback</h4><p>Every answer is scored, and the report ends with the one thing to fix first.</p></div>
+        </div>
+    </section>
+
+    <section class="section" id="real">
+        <div class="split">
+            <div>
+                <div class="eyebrow">Why it feels real</div>
+                <h2>Honest, <em>not flattering.</em></h2>
+                <p>Most practice tools tell you that you did great. This one scores what you actually said, for relevance, completeness and clarity, then tells you plainly.</p>
+                <ul class="ticks">
+                    <li>It talks and listens, out loud, like an interviewer does.</li>
+                    <li>It asks about your resume, not a generic script.</li>
+                    <li>It gives a score and a reason for every answer.</li>
+                </ul>
+            </div>
+            <div class="report-card">
+                <div class="report-head"><span class="t">Your feedback</span><span class="score-big">5.0<small>/10</small><span class="verdict mid">Needs work</span></span></div>
+                <div class="well">What went well</div>
+                <p class="line">A detailed cloud design with multi-zone availability scored 8/10.</p>
+                <div class="held">What held you back</div>
+                <p class="line">One answer was only a sentence fragment and scored 1/10.</p>
+                <div class="fixfirst"><b>Fix this first</b><span>Give two or three sentences per answer, with one concrete detail from a project.</span></div>
+                <p style="margin:14px 0 0;font-size:13px;">Sample report</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="section" id="coding">
+        <div class="split">
+            <div class="report-card">
+                <div class="report-head"><span class="t">Two Sum</span><span class="verdict">Easy</span></div>
+<pre>def two_sum(nums, target):
+    seen = {}
+    for i, x in enumerate(nums):
+        if target - x in seen:
+            return [seen[target - x], i]
+        seen[x] = i</pre>
+                <p class="line" style="margin:14px 0 0;">All 7 tests passed &middot; 0 hints &middot; thought aloud</p>
+                <p style="margin:10px 0 0;font-size:13px;">Sample coding round</p>
+            </div>
+            <div>
+                <div class="eyebrow">New: the coding round</div>
+                <h2>Solve it <em>out loud.</em></h2>
+                <p>Pick a DSA problem, write your solution, and run it against hidden tests. Think aloud while you code, because the report counts what you said.</p>
+                <ul class="ticks">
+                    <li>Five problems, from easy to medium.</li>
+                    <li>Hints that nudge you and never give the answer.</li>
+                    <li>A score out of 100 and one thing to fix first.</li>
+                </ul>
+                <a class="btn-link" href="/coding"><button>Start the coding round</button></a>
+            </div>
+        </div>
+    </section>
+
+    <section class="cta">
+        <div class="orb"></div>
+        <h2>Ready when <em>you are.</em></h2>
+        <p>Set up in a minute and start talking.</p>
+        <a class="btn-link" href="/upload"><button>Start your interview</button></a>
+    </section>
+</div>
+</body>
+</html>
